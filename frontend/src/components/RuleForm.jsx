@@ -5,8 +5,10 @@ import { tierFor } from "./SeverityBadge";
 
 function initialScopeFor(rule) {
   if (!rule) return {};
-  if (rule.rule_type === "long_call") {
-    return { agent_ids: (rule.scope.agent_ids || []).join(", ") };
+  // Any stored "agent_ids" array needs to become the comma-separated
+  // string the text field expects; everything else passes through as-is.
+  if (Array.isArray(rule.scope.agent_ids)) {
+    return { ...rule.scope, agent_ids: rule.scope.agent_ids.join(", ") };
   }
   return rule.scope;
 }
@@ -33,14 +35,19 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
     setSeverity(RULE_TYPES[nextType].defaultSeverity);
   };
 
-  // Normalized once, used for both the live preview and the submit payload —
-  // scope.agent_ids is a raw string while the user is typing (comma and/or
-  // whitespace separated — "a_31, a_11" and "a_31 a_11" both work), and
-  // describe() needs a real array either way.
-  const normalizedScope =
-    ruleType === "long_call"
-      ? { agent_ids: (scope.agent_ids || "").split(/[,\s]+/).map((s) => s.trim()).filter(Boolean) }
-      : { queue_id: (scope.queue_id || "").trim() };
+  // Normalized once, used for both the live preview and the submit payload.
+  // Any "agent_ids" field is a raw string while the user is typing (comma
+  // and/or whitespace separated — "a_31, a_11" and "a_31 a_11" both work)
+  // and needs to become a real array; every other field is just trimmed.
+  const normalizedScope = Object.fromEntries(
+    config.scopeFields.map((f) => {
+      const raw = scope[f.name] || "";
+      if (f.name === "agent_ids") {
+        return [f.name, raw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)];
+      }
+      return [f.name, raw.trim()];
+    })
+  );
   const normalizedParams = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, Number(v) || 0]));
 
   const handleSubmit = async (e) => {
