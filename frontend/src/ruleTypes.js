@@ -11,7 +11,7 @@ export const RULE_TYPES = {
     label: "SLA at risk",
     defaultSeverity: 3,
     scopeFields: [{ name: "queue_id", label: "Queue", type: "text", placeholder: "billing" }],
-    paramsFields: [{ name: "pct_of_sla", label: "Warn at % of SLA (e.g. 0.8)", type: "number" }],
+    paramsFields: [{ name: "pct_of_sla", label: "Warn at this % of the SLA deadline", type: "number", isPercent: true }],
     describe: (scope, params) =>
       `Warn me when ${scope.queue_id || "this queue"} is close to missing its SLA (${(params.pct_of_sla ?? 0) * 100 || "?"}%)`,
   },
@@ -26,7 +26,7 @@ export const RULE_TYPES = {
     label: "Volume surge",
     defaultSeverity: 6,
     scopeFields: [{ name: "queue_id", label: "Queue", type: "text", placeholder: "billing" }],
-    paramsFields: [{ name: "pct_over_forecast", label: "Surge threshold (e.g. 0.5 = 50% over forecast)", type: "number" }],
+    paramsFields: [{ name: "pct_over_forecast", label: "Surge threshold, % over forecast", type: "number", isPercent: true }],
     describe: (scope, params) =>
       `Notify me when ${scope.queue_id || "this queue"}'s volume is running well above what was forecasted (>${(params.pct_over_forecast ?? 0) * 100 || "?"}%)`,
   },
@@ -73,7 +73,7 @@ export const RULE_TYPES = {
     label: "Occupancy",
     defaultSeverity: 5,
     scopeFields: [{ name: "queue_id", label: "Queue", type: "text", placeholder: "billing" }],
-    paramsFields: [{ name: "occupancy_threshold", label: "Occupancy threshold (e.g. 0.8 = 80%)", type: "number" }],
+    paramsFields: [{ name: "occupancy_threshold", label: "Occupancy threshold %", type: "number", isPercent: true }],
     describe: (scope, params) =>
       `Notify me when ${scope.queue_id || "this queue"}'s occupancy crosses ${(params.occupancy_threshold ?? 0) * 100 || "?"}%`,
   },

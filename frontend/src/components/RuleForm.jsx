@@ -13,11 +13,21 @@ function initialScopeFor(rule) {
   return rule.scope;
 }
 
+function initialParamsFor(rule) {
+  if (!rule) return {};
+  const config = RULE_TYPES[rule.rule_type];
+  // Stored percent fields are fractions (0.8); the input shows whole
+  // numbers (80), so convert back on the way in, mirroring the /100 on submit.
+  return Object.fromEntries(
+    config.paramsFields.map((f) => [f.name, f.isPercent ? rule.params[f.name] * 100 : rule.params[f.name]])
+  );
+}
+
 export default function RuleForm({ onCreated, onCancel, initialRule }) {
   const isEditing = Boolean(initialRule);
   const [ruleType, setRuleType] = useState(initialRule?.rule_type ?? "queue_backlog");
   const [scope, setScope] = useState(() => initialScopeFor(initialRule));
-  const [params, setParams] = useState(() => initialRule?.params ?? {});
+  const [params, setParams] = useState(() => initialParamsFor(initialRule));
   const [recipientId, setRecipientId] = useState(initialRule?.recipient_id ?? "");
   const [severity, setSeverity] = useState(initialRule?.severity ?? RULE_TYPES.queue_backlog.defaultSeverity);
   const config = RULE_TYPES[ruleType];
@@ -48,7 +58,12 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
       return [f.name, raw.trim()];
     })
   );
-  const normalizedParams = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, Number(v) || 0]));
+  const normalizedParams = Object.fromEntries(
+    config.paramsFields.map((f) => {
+      const raw = Number(params[f.name]) || 0;
+      return [f.name, f.isPercent ? raw / 100 : raw];
+    })
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -106,7 +121,8 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
           <input
             name={f.name}
             type={f.type}
-            min={f.type === "number" ? 1 : undefined}
+            min={f.isPercent ? 1 : f.type === "number" ? 1 : undefined}
+            max={f.isPercent ? 100 : undefined}
             value={params[f.name] || ""}
             onChange={handleField(setParams)}
             required

@@ -141,3 +141,29 @@ def test_team_adherence_capacity_counts_across_multiple_events():
     notifications = engine.on_event(ingestor.process(_adherence("e2", "a_31")))
     assert len(notifications) == 1
     assert "2 of your agents" in notifications[0].message
+
+
+def test_team_adherence_capacity_tally_survives_a_rule_cache_refresh():
+    ingestor = Ingestor()
+    rule = TeamAdherenceCapacityRule(
+        rule_id="r", scope={"agent_ids": ["a_19", "a_31", "a_88"]}, params={"count_threshold": 1},
+        recipient_id="lead_maria", severity=8,
+    )
+    engine = Engine(rules=[rule])
+
+    engine.on_event(ingestor.process(_adherence("e1", "a_19")))
+    engine.on_event(ingestor.process(_adherence("e2", "a_31")))  # 2 violating, already fired once
+
+    # simulate the poller: a brand new rule object, same rule_id, no memory of its own
+    fresh_rule = TeamAdherenceCapacityRule(
+        rule_id="r", scope={"agent_ids": ["a_19", "a_31", "a_88"]}, params={"count_threshold": 1},
+        recipient_id="lead_maria", severity=8,
+    )
+    assert fresh_rule._violating_agents == set()  # confirms it really starts empty
+    engine.set_rules([fresh_rule])
+
+    # without carry_over_state, this would be undercounted (2 not 3) since the
+    # fresh object never saw a_19/a_31's original events
+    notifications = engine.on_event(ingestor.process(_adherence("e3", "a_88")))
+    assert engine.rules[0]._violating_agents == {"a_19", "a_31", "a_88"}
+    assert notifications == []  # still "firing" from before, not a fresh transition

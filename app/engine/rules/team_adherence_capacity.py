@@ -8,11 +8,10 @@ class TeamAdherenceCapacityRule(Rule):
     Tracks which agents are currently in violation internally, since no
     single adherence_check event knows about anyone but itself.
 
-    Known limitation: this internal tracking lives on the Rule instance,
-    which gets rebuilt from scratch every time the rule-cache poller
-    refreshes (~every 5s) — so it can take a fresh adherence_check per
-    agent after a refresh to rebuild an accurate picture. Same category of
-    tradeoff as the documented rule_state limitation."""
+    That internal tracking would normally be wiped every time the
+    rule-cache poller rebuilds this rule from the database (~every 5s) —
+    carry_over_state() below is what prevents that, by copying the tally
+    from the previous instance into the new one during a refresh."""
 
     rule_type = "team_adherence_capacity"
     default_severity = 8
@@ -20,6 +19,10 @@ class TeamAdherenceCapacityRule(Rule):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._violating_agents: set[str] = set()
+
+    def carry_over_state(self, previous: Rule | None) -> None:
+        if isinstance(previous, TeamAdherenceCapacityRule):
+            self._violating_agents = previous._violating_agents
 
     def entity_key(self, event: Event) -> str | None:
         if event.type != "adherence_check" or event.agent_id.strip() not in {
