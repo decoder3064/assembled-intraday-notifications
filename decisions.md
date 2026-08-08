@@ -87,6 +87,6 @@ Two things worth separating clearly, since they're easy to conflate:
 - Auth/multi-tenancy — out of scope per the prompt.
 
 **Known rough edges, worth naming rather than hiding:**
-- No automated frontend tests — verified manually via the browser tool throughout, but there's no equivalent of the backend's pytest suite for the UI.
+- Frontend has automated tests now (Vitest + React Testing Library, `frontend/src/**/*.test.jsx`), but coverage is targeted at the riskiest logic (the two real bugs found — the agent-IDs crash and the percent-field conversion — plus the tier classification), not exhaustive component coverage the way the backend's pytest suite is for the engine.
 - Params validation (`Field(ge=1, le=10)` for severity, a generic negative-number check for `params`) is a light guard, not exhaustive — e.g., nothing stops a `duration_min` of 0.5 or a wildly large threshold; good enough for this scope, not production-grade input validation.
 

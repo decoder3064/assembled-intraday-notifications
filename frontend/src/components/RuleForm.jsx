@@ -91,8 +91,8 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
   return (
     <form className="rule-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label>Rule type</label>
-        <select value={ruleType} onChange={handleRuleTypeChange} disabled={isEditing}>
+        <label htmlFor="rule-type">Rule type</label>
+        <select id="rule-type" value={ruleType} onChange={handleRuleTypeChange} disabled={isEditing}>
           {Object.entries(RULE_TYPES).map(([key, cfg]) => (
             <option key={key} value={key}>
               {cfg.label}
@@ -103,8 +103,9 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
 
       {config.scopeFields.map((f) => (
         <div className="form-group" key={f.name}>
-          <label>{f.label}</label>
+          <label htmlFor={`scope-${f.name}`}>{f.label}</label>
           <input
+            id={`scope-${f.name}`}
             name={f.name}
             type={f.type}
             placeholder={f.placeholder}
@@ -117,8 +118,9 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
 
       {config.paramsFields.map((f) => (
         <div className="form-group" key={f.name}>
-          <label>{f.label}</label>
+          <label htmlFor={`params-${f.name}`}>{f.label}</label>
           <input
+            id={`params-${f.name}`}
             name={f.name}
             type={f.type}
             min={f.isPercent ? 1 : f.type === "number" ? 1 : undefined}
@@ -131,13 +133,20 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
       ))}
 
       <div className="form-group">
-        <label>Notify (recipient id)</label>
-        <input value={recipientId} onChange={(e) => setRecipientId(e.target.value)} placeholder="lead_maria" required />
+        <label htmlFor="recipient-id">Notify (recipient id)</label>
+        <input
+          id="recipient-id"
+          value={recipientId}
+          onChange={(e) => setRecipientId(e.target.value)}
+          placeholder="lead_maria"
+          required
+        />
       </div>
 
       <div className="form-group">
-        <label>Severity, 1–10 (higher = more urgent, shown first)</label>
+        <label htmlFor="severity">Severity, 1–10 (higher = more urgent, shown first)</label>
         <input
+          id="severity"
           type="number"
           min={1}
           max={10}

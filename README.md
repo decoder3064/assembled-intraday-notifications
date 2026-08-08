@@ -9,7 +9,7 @@ Assembled take-home — a system that watches live contact-center events (queue 
 ## What's built
 
 - **Ingestor** (`app/ingestor/`) — validates incoming events, drops duplicates, normalizes inconsistent data.
-- **Engine** (`app/engine/`) — evaluates events against rules. Two rule types implemented: `queue_backlog` (reactive) and `long_call` (duration-based, checked on a timer since nothing reports an in-progress call's length). Rules only notify on the ok→firing transition, not on every event.
+- **Engine** (`app/engine/`) — evaluates events against rules. All 10 designed rule types implemented: reactive (`queue_backlog`, `sla_risk`, `sla_breach`, `volume_surge`, `zero_coverage`, `adherence_self`, `adherence_escalated`), duration-based (`long_call`, checked on a timer since nothing reports an in-progress call's length), and one aggregate (`team_adherence_capacity`, tracks violations across multiple agents/events, with its own state that survives the rule-cache refresh — see `decisions.md`). Rules only notify on the ok→firing transition, not on every event.
 - **Persistence** (`app/persistence/`) — `rules`, `rule_state`, `notifications` tables in Postgres.
 - **Router** (`app/router/`) — persists notifications and delivers them (console stub for now).
 - **API** (`app/api/`) — full CRUD on rules (create/list/edit/delete), notifications (list/resolve/unresolve/delete), and a `/events` endpoint that feeds the running engine. A background poller refreshes the engine's rules from the database every 5 seconds, so a rule created while the server is running takes effect without a restart. The app creates its own database schema on startup, so it works against a genuinely empty database.
@@ -25,6 +25,11 @@ docker compose up -d db
 Run the backend test suite (uses its own isolated test database, separate from whatever you're running locally):
 ```bash
 uv run pytest -v
+```
+
+Run the frontend test suite:
+```bash
+cd frontend && npm test
 ```
 
 Run the API:
@@ -45,7 +50,6 @@ Two demo scripts, both replaying `data/events.txt` at a configurable pace (`--sp
 
 ## Not built yet
 
-- Most of the rule catalog beyond `queue_backlog` and `long_call` (the remaining types are designed in `decisions.md` but not implemented — deliberate, see the implementation log for why).
 - `rule_state` isn't persisted — see the comment on `RuleStateRow` in `app/persistence/models.py` for why, and what a production fix would look like.
+- The more general "diff the rule-cache poller instead of a per-rule hook" fix — see `decisions.md` for the reasoning on why the narrower fix was chosen instead.
 - Auth, multi-tenancy, and real Slack/email delivery — explicitly out of scope per the prompt.
-- Automated frontend tests — the UI was verified manually throughout, not covered by an automated suite the way the backend is.
