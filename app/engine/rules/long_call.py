@@ -9,7 +9,9 @@ class LongCallRule(DurationRule):
         return "on_call"
 
     def applies_to(self, agent_id: str) -> bool:
-        return agent_id in self.scope["agent_ids"]
+        # Stripped so stray whitespace in a stored agent id doesn't
+        # silently prevent a real match.
+        return agent_id.strip() in {a.strip() for a in self.scope["agent_ids"]}
 
     def is_too_long(self, seconds_in_state: float) -> bool:
         return seconds_in_state > self.params["duration_min"] * 60

@@ -70,3 +70,39 @@ def test_below_threshold_never_fires():
     notifications = engine.on_event(event)
 
     assert notifications == []
+
+
+def test_set_rules_replaces_the_active_rule_list():
+    rule_a = QueueBacklogRule(
+        rule_id="a", scope={"queue_id": "billing"}, params={"threshold": 20},
+        recipient_id="lead_maria", severity=4,
+    )
+    rule_b = QueueBacklogRule(
+        rule_id="b", scope={"queue_id": "tier_2"}, params={"threshold": 5},
+        recipient_id="lead_maria", severity=4,
+    )
+
+    engine = Engine(rules=[rule_a])
+    assert engine.rules == [rule_a]
+
+    engine.set_rules([rule_b])
+    assert engine.rules == [rule_b]
+
+
+def test_no_repeat_alert_survives_a_rule_refresh_with_the_same_rule_id():
+    """A poll-refresh builds brand new Rule objects from the database every
+    cycle. Since RuleStateTracker keys on rule_id (not object identity), a
+    rule that's already firing shouldn't re-notify just because the object
+    representing it got swapped out for a fresh one with the same id."""
+    ingestor = Ingestor()
+    rule_v1 = _rule(threshold=20)
+    engine = Engine(rules=[rule_v1])
+
+    notifications = engine.on_event(ingestor.process(_snapshot("evt_1", tickets_waiting=25)))
+    assert len(notifications) == 1  # first breach, fires
+
+    rule_v2 = _rule(threshold=20)  # a different object, same rule_id
+    engine.set_rules([rule_v2])
+
+    notifications = engine.on_event(ingestor.process(_snapshot("evt_2", tickets_waiting=30)))
+    assert notifications == []  # still firing, no repeat, despite the object swap

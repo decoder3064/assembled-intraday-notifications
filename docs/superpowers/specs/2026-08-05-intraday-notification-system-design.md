@@ -1,6 +1,8 @@
 # Intraday Notification System — Design Spec
 
-Assembled take-home. This is the formal reference for what's being built and why. The reasoning/narrative version, meant for the live walkthrough, lives in [`decisions.md`](../../../decisions.md) at the repo root — this doc is the thing the code should match.
+Assembled take-home. This is the formal reference for what's being built and why, written before implementation started. The reasoning/narrative version, meant for the live walkthrough, lives in [`decisions.md`](../../../decisions.md) at the repo root.
+
+**This doc reflects pre-implementation intent, not final as-built state.** Where the two disagree, `decisions.md`'s "Implementation Log" section (added after building started) is the accurate one — notably: only `queue_backlog` and `long_call` from the §5 rule catalog got built (deliberately, not all 10), the frontend went further than a bare list+form (a full CRUD UI with an active/resolved notification workflow), and `rule_state` persistence (§9) was confirmed as a named, undone limitation rather than resolved.
 
 ## 1. Problem and scope
 
