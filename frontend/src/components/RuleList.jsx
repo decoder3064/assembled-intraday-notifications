@@ -38,7 +38,6 @@ export default function RuleList({ rules, onChanged, onEdit }) {
           </div>
           <p className="rule-description">{rule.description}</p>
           <div className="rule-card-bottom">
-            <span className="rule-recipient">notifies {rule.recipient_id}</span>
             <div className="rule-card-actions">
               <button className="btn btn-small btn-outline" onClick={() => toggle(rule)}>
                 {rule.enabled ? "Disable" : "Enable"}

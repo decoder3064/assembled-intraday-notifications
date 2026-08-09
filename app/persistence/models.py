@@ -44,15 +44,17 @@ class RuleStateRow(Base):
 
 class NotificationRow(Base):
     """rule_id is nullable and set to NULL (not cascaded) when the owning
-    rule is deleted — a notification's message, severity, and recipient are
-    already stored on the row itself, so the notification stays meaningful
-    on its own even once the rule that caused it is gone. History is kept
-    on purpose; only the backlink to the (now-deleted) rule is lost."""
+    rule is deleted — a notification's message, severity, recipient, and
+    rule_type are already stored on the row itself, so the notification
+    stays meaningful on its own even once the rule that caused it is gone.
+    History is kept on purpose; only the backlink to the (now-deleted) rule
+    is lost."""
 
     __tablename__ = "notifications"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     rule_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("rules.id", ondelete="SET NULL"), nullable=True)
+    rule_type: Mapped[str | None]
     recipient_id: Mapped[str]
     message: Mapped[str]
     severity: Mapped[int]

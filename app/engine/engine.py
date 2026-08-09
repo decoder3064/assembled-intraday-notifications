@@ -9,6 +9,7 @@ from app.ingestor.schemas import Event
 class Notification:
     def __init__(self, rule: Rule, message: str):
         self.rule_id = rule.rule_id
+        self.rule_type = rule.rule_type
         self.recipient_id = rule.recipient_id
         self.severity = rule.severity
         self.message = message

@@ -1,6 +1,5 @@
 from app.engine.rule import Rule
 from app.engine.rules.adherence_escalated import AdherenceEscalatedRule
-from app.engine.rules.adherence_self import AdherenceSelfRule
 from app.engine.rules.long_call import LongCallRule
 from app.engine.rules.occupancy import OccupancyRule
 from app.engine.rules.queue_backlog import QueueBacklogRule
@@ -17,7 +16,6 @@ RULE_REGISTRY: dict[str, type[Rule]] = {
     SlaBreachRule.rule_type: SlaBreachRule,
     VolumeSurgeRule.rule_type: VolumeSurgeRule,
     ZeroCoverageRule.rule_type: ZeroCoverageRule,
-    AdherenceSelfRule.rule_type: AdherenceSelfRule,
     AdherenceEscalatedRule.rule_type: AdherenceEscalatedRule,
     TeamAdherenceCapacityRule.rule_type: TeamAdherenceCapacityRule,
     OccupancyRule.rule_type: OccupancyRule,
