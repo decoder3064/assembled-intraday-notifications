@@ -1,15 +1,14 @@
 import { useState } from "react";
 import { RULE_TYPES } from "../ruleTypes";
+import { KNOWN_AGENTS, KNOWN_QUEUES } from "../knownEntities";
 import { createRule, updateRule } from "../api";
 import { tierFor } from "./SeverityBadge";
 
 function initialScopeFor(rule) {
   if (!rule) return {};
-  // Any stored "agent_ids" array needs to become the comma-separated
-  // string the text field expects; everything else passes through as-is.
-  if (Array.isArray(rule.scope.agent_ids)) {
-    return { ...rule.scope, agent_ids: rule.scope.agent_ids.join(", ") };
-  }
+  // Scope values are already stored in the exact shape the controls need —
+  // arrays for "agents" checkboxes, plain strings for "queue"/"agent"
+  // dropdowns — so no conversion is needed on the way in.
   return rule.scope;
 }
 
@@ -37,6 +36,12 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
     setter((prev) => ({ ...prev, [name]: value }));
   };
 
+  const toggleAgent = (fieldName, agentId) => (e) => {
+    const current = scope[fieldName] || [];
+    const next = e.target.checked ? [...current, agentId] : current.filter((a) => a !== agentId);
+    setScope((prev) => ({ ...prev, [fieldName]: next }));
+  };
+
   const handleRuleTypeChange = (e) => {
     const nextType = e.target.value;
     setRuleType(nextType);
@@ -46,17 +51,12 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
   };
 
   // Normalized once, used for both the live preview and the submit payload.
-  // Any "agent_ids" field is a raw string while the user is typing (comma
-  // and/or whitespace separated — "a_31, a_11" and "a_31 a_11" both work)
-  // and needs to become a real array; every other field is just trimmed.
+  // "agents" fields are already a real array (built by the checkboxes);
+  // "queue"/"agent" fields are already an exact value (chosen from a
+  // dropdown, so there's nothing to typo) — no string parsing needed here
+  // at all, unlike the old free-text version of this form.
   const normalizedScope = Object.fromEntries(
-    config.scopeFields.map((f) => {
-      const raw = scope[f.name] || "";
-      if (f.name === "agent_ids") {
-        return [f.name, raw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)];
-      }
-      return [f.name, raw.trim()];
-    })
+    config.scopeFields.map((f) => [f.name, f.kind === "agents" ? scope[f.name] || [] : scope[f.name] || ""])
   );
   const normalizedParams = Object.fromEntries(
     config.paramsFields.map((f) => {
@@ -104,15 +104,47 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
       {config.scopeFields.map((f) => (
         <div className="form-group" key={f.name}>
           <label htmlFor={`scope-${f.name}`}>{f.label}</label>
-          <input
-            id={`scope-${f.name}`}
-            name={f.name}
-            type={f.type}
-            placeholder={f.placeholder}
-            value={scope[f.name] || ""}
-            onChange={handleField(setScope)}
-            required
-          />
+
+          {f.kind === "queue" && (
+            <select id={`scope-${f.name}`} name={f.name} value={scope[f.name] || ""} onChange={handleField(setScope)} required>
+              <option value="" disabled>
+                Select a queue
+              </option>
+              {KNOWN_QUEUES.map((q) => (
+                <option key={q} value={q}>
+                  {q}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {f.kind === "agent" && (
+            <select id={`scope-${f.name}`} name={f.name} value={scope[f.name] || ""} onChange={handleField(setScope)} required>
+              <option value="" disabled>
+                Select an agent
+              </option>
+              {KNOWN_AGENTS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {f.kind === "agents" && (
+            <div id={`scope-${f.name}`} className="checkbox-group">
+              {KNOWN_AGENTS.map((a) => (
+                <label key={a} className="checkbox-option">
+                  <input
+                    type="checkbox"
+                    checked={(scope[f.name] || []).includes(a)}
+                    onChange={toggleAgent(f.name, a)}
+                  />
+                  {a}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       ))}
 
