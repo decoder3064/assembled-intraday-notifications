@@ -26,6 +26,13 @@ class Rule(ABC):
     def render_message(self, event: Event) -> str:
         ...
 
+    def carry_over_state(self, previous: "Rule | None") -> None:
+        """For rules that keep extra memory beyond what RuleStateTracker/
+        AgentStateTracker already handle on the Engine (and which therefore
+        already survive a rule-cache refresh). No-op by default — only a
+        rule that actually keeps such memory needs to override this."""
+        pass
+
 
 class DurationRule(Rule):
     """A rule that fires based on how long an agent has stayed in one state,

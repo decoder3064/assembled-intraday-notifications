@@ -20,6 +20,12 @@ class Engine:
         self.state = RuleStateTracker()
         self.agent_states = AgentStateTracker()
 
+    def set_rules(self, rules: list[Rule]) -> None:
+        old_by_id = {r.rule_id: r for r in self.rules}
+        for new_rule in rules:
+            new_rule.carry_over_state(old_by_id.get(new_rule.rule_id))
+        self.rules = rules
+
     def on_event(self, event: Event) -> list[Notification]:
         if event.type == "agent_state_change":
             self.agent_states.update(event.agent_id, event.new_state, event.ts)
