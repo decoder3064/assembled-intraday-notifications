@@ -4,7 +4,6 @@ from app.ingestor.schemas import Event
 
 class OccupancyRule(Rule):
     rule_type = "occupancy"
-    default_severity = 5
 
     def entity_key(self, event: Event) -> str | None:
         if event.type != "queue_snapshot" or event.queue_id.strip() != self.scope["queue_id"].strip():
@@ -20,4 +19,4 @@ class OccupancyRule(Rule):
     def render_message(self, event: Event) -> str:
         total = event.agents_on_call + event.agents_available
         pct = round(100 * event.agents_on_call / total) if total else 0
-        return f"{event.queue_id} occupancy at {pct}% ({event.agents_on_call}/{total} agents on calls)"
+        return f"{event.queue_id} occupancy is at {pct}%: {event.agents_on_call} of {total} agents are on calls"

@@ -5,7 +5,6 @@ from app.ingestor.schemas import Event
 
 class Rule(ABC):
     rule_type: str
-    default_severity: int  # suggested starting point for the creation form; not enforced
 
     def __init__(self, rule_id: str, scope: dict, params: dict, recipient_id: str, severity: int):
         self.rule_id = rule_id
@@ -27,10 +26,7 @@ class Rule(ABC):
         ...
 
     def carry_over_state(self, previous: "Rule | None") -> None:
-        """For rules that keep extra memory beyond what RuleStateTracker/
-        AgentStateTracker already handle on the Engine (and which therefore
-        already survive a rule-cache refresh). No-op by default — only a
-        rule that actually keeps such memory needs to override this."""
+        """No-op by default — override if a rule keeps its own extra state."""
         pass
 
 

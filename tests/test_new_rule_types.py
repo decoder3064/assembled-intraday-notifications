@@ -1,6 +1,5 @@
 from app.engine.engine import Engine
 from app.engine.rules.adherence_escalated import AdherenceEscalatedRule
-from app.engine.rules.adherence_self import AdherenceSelfRule
 from app.engine.rules.occupancy import OccupancyRule
 from app.engine.rules.sla_breach import SlaBreachRule
 from app.engine.rules.sla_risk import SlaRiskRule
@@ -97,24 +96,6 @@ def test_occupancy_fires_past_threshold():
     assert len(engine.on_event(event)) == 1
 
 
-def test_adherence_self_uses_event_supplied_duration_no_clock_needed():
-    ingestor = Ingestor()
-    rule = AdherenceSelfRule(rule_id="r", scope={"agent_id": "a_19"}, params={"duration_min": 10}, recipient_id="a_19", severity=2)
-    engine = Engine(rules=[rule])
-
-    event = ingestor.process(_adherence("e1", "a_19"))  # 15 min violation, 10 min threshold
-    assert len(engine.on_event(event)) == 1
-
-
-def test_adherence_self_ignores_missing_violation_started_at():
-    ingestor = Ingestor()
-    rule = AdherenceSelfRule(rule_id="r", scope={"agent_id": "a_19"}, params={"duration_min": 10}, recipient_id="a_19", severity=2)
-    engine = Engine(rules=[rule])
-
-    event = ingestor.process(_adherence("e1", "a_19", violation_started_at=None))
-    assert engine.on_event(event) == []  # can't compute duration, must not crash or false-fire
-
-
 def test_adherence_escalated_scoped_to_team_not_just_one_agent():
     ingestor = Ingestor()
     rule = AdherenceEscalatedRule(
@@ -141,6 +122,26 @@ def test_team_adherence_capacity_counts_across_multiple_events():
     notifications = engine.on_event(ingestor.process(_adherence("e2", "a_31")))
     assert len(notifications) == 1
     assert "2 of your agents" in notifications[0].message
+
+
+def test_team_adherence_capacity_ignores_a_late_arriving_stale_event():
+    ingestor = Ingestor()
+    rule = TeamAdherenceCapacityRule(
+        rule_id="r", scope={"agent_ids": ["a_19", "a_31"]}, params={"count_threshold": 0},
+        recipient_id="lead_maria", severity=8,
+    )
+    engine = Engine(rules=[rule])
+
+    # A newer event says a_19 is in violation.
+    engine.on_event(ingestor.process(_adherence("e1", "a_19", ts="2026-05-26T09:45:00Z")))
+    assert "a_19" in rule._violating_agents
+
+    # A late-arriving event, older than the one already processed, says
+    # a_19 was fine — it must not undo the newer, still-true violation.
+    engine.on_event(
+        ingestor.process(_adherence("e2", "a_19", ts="2026-05-26T09:15:00Z", in_violation=False, violation_started_at=None))
+    )
+    assert "a_19" in rule._violating_agents
 
 
 def test_team_adherence_capacity_tally_survives_a_rule_cache_refresh():

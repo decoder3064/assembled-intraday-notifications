@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session
-from app.api.schemas import RuleCreate, RuleOut, RuleUpdate
+from app.api.schemas import DEFAULT_RECIPIENT_ID, RuleCreate, RuleOut, RuleUpdate
 from app.engine.rules import RULE_REGISTRY
 from app.persistence.models import RuleRow
 
@@ -24,7 +24,7 @@ async def create_rule(payload: RuleCreate, session: AsyncSession = Depends(get_s
         raise HTTPException(status_code=422, detail=f"unrecognized rule type: {payload.rule_type!r}")
     _validate_params(payload.params)
 
-    row = RuleRow(**payload.model_dump())
+    row = RuleRow(**payload.model_dump(), recipient_id=DEFAULT_RECIPIENT_ID)
     session.add(row)
     await session.commit()
     await session.refresh(row)

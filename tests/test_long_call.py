@@ -41,7 +41,7 @@ def test_tick_after_threshold_fires_once():
 
     assert len(notifications) == 1
     assert notifications[0].recipient_id == "lead_maria"
-    assert "a_19" in notifications[0].message
+    assert "Agent 19" in notifications[0].message
 
 
 def test_repeated_ticks_while_still_on_the_call_do_not_repeat():

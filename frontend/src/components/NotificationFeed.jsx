@@ -1,4 +1,5 @@
 import { deleteNotification, resolveNotification, unresolveNotification } from "../api";
+import { RULE_TYPES } from "../ruleTypes";
 import SeverityBadge, { tierFor } from "./SeverityBadge";
 
 export default function NotificationFeed({ notifications, resolved, onChanged }) {
@@ -34,12 +35,14 @@ export default function NotificationFeed({ notifications, resolved, onChanged })
           key={n.id}
         >
           <div className="rule-card-top">
-            <SeverityBadge severity={n.severity} />
-            <span className="notification-time">{new Date(n.sent_at).toLocaleTimeString()}</span>
+            {n.rule_type && <span className="rule-type-tag">{RULE_TYPES[n.rule_type]?.label ?? n.rule_type}</span>}
+            <div className="notification-meta">
+              <SeverityBadge severity={n.severity} />
+              <span className="notification-time">{new Date(n.sent_at).toLocaleTimeString()}</span>
+            </div>
           </div>
           <p className="notification-message">{n.message}</p>
           <div className="rule-card-bottom">
-            <span className="rule-recipient">to {n.recipient_id}</span>
             <div className="rule-card-actions">
               {resolved ? (
                 <button className="btn btn-small btn-outline" onClick={() => undo(n)}>

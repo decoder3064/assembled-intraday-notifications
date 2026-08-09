@@ -1,9 +1,10 @@
+from app.util.agent_names import format_agent_name
+from app.util.duration import format_duration
 from app.engine.rule import DurationRule
 
 
 class LongCallRule(DurationRule):
     rule_type = "long_call"
-    default_severity = 6
 
     def watched_state(self) -> str:
         return "on_call"
@@ -17,5 +18,9 @@ class LongCallRule(DurationRule):
         return seconds_in_state > self.params["duration_min"] * 60
 
     def render_duration_message(self, agent_id: str, seconds_in_state: int) -> str:
-        minutes = seconds_in_state // 60
-        return f"{agent_id} has been on a call for {minutes} min (threshold: {self.params['duration_min']})"
+        threshold_sec = self.params["duration_min"] * 60
+        overage = format_duration(seconds_in_state - threshold_sec)
+        return (
+            f"{format_agent_name(agent_id)} has been on one call for {format_duration(seconds_in_state)} now, "
+            f"{overage} past your {format_duration(threshold_sec)} limit"
+        )

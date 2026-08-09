@@ -19,7 +19,6 @@ describe("RuleForm", () => {
     await user.selectOptions(screen.getByLabelText(/rule type/i), "sla_risk");
     await user.selectOptions(screen.getByLabelText(/queue/i), "billing");
     await user.type(screen.getByLabelText(/warn at/i), "80");
-    await user.type(screen.getByLabelText(/recipient/i), "lead_maria");
     await user.click(screen.getByRole("button", { name: /create rule/i }));
 
     expect(api.createRule).toHaveBeenCalledWith(expect.objectContaining({ params: { pct_of_sla: 0.8 } }));
@@ -86,8 +85,19 @@ describe("RuleForm — entity selection", () => {
     await user.selectOptions(screen.getByLabelText(/rule type/i), "long_call");
 
     expect(screen.queryByRole("textbox", { name: /agent/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "a_31" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "a_11" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Agent 31" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Agent 11" })).toBeInTheDocument();
+  });
+
+  it("shows a whole-team checkbox that selects every known agent at once", async () => {
+    const user = userEvent.setup();
+    render(<RuleForm onCreated={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText(/rule type/i), "long_call");
+    await user.click(screen.getByRole("checkbox", { name: /whole team/i }));
+
+    expect(screen.getByRole("checkbox", { name: "Agent 31" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Agent 5" })).toBeChecked();
   });
 
   it("checking two agents submits a real array, not a parsed string", async () => {
@@ -95,10 +105,9 @@ describe("RuleForm — entity selection", () => {
     render(<RuleForm onCreated={vi.fn()} onCancel={vi.fn()} />);
 
     await user.selectOptions(screen.getByLabelText(/rule type/i), "long_call");
-    await user.click(screen.getByRole("checkbox", { name: "a_31" }));
-    await user.click(screen.getByRole("checkbox", { name: "a_11" }));
+    await user.click(screen.getByRole("checkbox", { name: "Agent 31" }));
+    await user.click(screen.getByRole("checkbox", { name: "Agent 11" }));
     await user.type(screen.getByLabelText(/minutes threshold/i), "45");
-    await user.type(screen.getByLabelText(/recipient/i), "lead_maria");
     await user.click(screen.getByRole("button", { name: /create rule/i }));
 
     expect(api.createRule).toHaveBeenCalledWith(
@@ -111,11 +120,10 @@ describe("RuleForm — entity selection", () => {
     render(<RuleForm onCreated={vi.fn()} onCancel={vi.fn()} />);
 
     await user.selectOptions(screen.getByLabelText(/rule type/i), "long_call");
-    await user.click(screen.getByRole("checkbox", { name: "a_31" }));
-    await user.click(screen.getByRole("checkbox", { name: "a_11" }));
-    await user.click(screen.getByRole("checkbox", { name: "a_31" })); // uncheck
+    await user.click(screen.getByRole("checkbox", { name: "Agent 31" }));
+    await user.click(screen.getByRole("checkbox", { name: "Agent 11" }));
+    await user.click(screen.getByRole("checkbox", { name: "Agent 31" })); // uncheck
     await user.type(screen.getByLabelText(/minutes threshold/i), "45");
-    await user.type(screen.getByLabelText(/recipient/i), "lead_maria");
     await user.click(screen.getByRole("button", { name: /create rule/i }));
 
     expect(api.createRule).toHaveBeenCalledWith(expect.objectContaining({ scope: { agent_ids: ["a_11"] } }));
@@ -137,18 +145,8 @@ describe("RuleForm — entity selection", () => {
       />
     );
 
-    expect(screen.getByRole("checkbox", { name: "a_31" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "a_11" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "a_19" })).not.toBeChecked();
-  });
-
-  it("shows a single-agent dropdown for adherence_self, not checkboxes or free text", async () => {
-    const user = userEvent.setup();
-    render(<RuleForm onCreated={vi.fn()} onCancel={vi.fn()} />);
-
-    await user.selectOptions(screen.getByLabelText(/rule type/i), "adherence_self");
-
-    const agentField = screen.getByLabelText(/your agent id/i);
-    expect(agentField.tagName).toBe("SELECT");
+    expect(screen.getByRole("checkbox", { name: "Agent 31" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Agent 11" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Agent 19" })).not.toBeChecked();
   });
 });

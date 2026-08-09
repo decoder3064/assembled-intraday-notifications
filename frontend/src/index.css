@@ -76,6 +76,14 @@ select:focus {
   width: auto;
 }
 
+.checkbox-option--all {
+  flex-basis: 100%;
+  font-weight: 600;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* layout */
 
 .app-shell {
@@ -103,17 +111,12 @@ select:focus {
 
 .app-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
+  margin-bottom: 24px;
 }
 
-@media (max-width: 1100px) {
-  .app-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .app-grid {
     grid-template-columns: 1fr;
   }
@@ -143,6 +146,31 @@ select:focus {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+}
+
+/* De-emphasized on purpose — resolved history matters far less day-to-day
+   than what's active, so it starts collapsed and stays visually quiet. */
+.panel-resolved {
+  padding: 14px 20px;
+  box-shadow: none;
+  background: transparent;
+  border-style: dashed;
+}
+
+.resolved-toggle {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.resolved-toggle:hover {
+  color: var(--text);
 }
 
 /* buttons */
@@ -204,8 +232,13 @@ select:focus {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 60vh;
+  max-height: 74vh;
   overflow-y: auto;
+}
+
+.panel-resolved .card-list {
+  max-height: 40vh;
+  margin-top: 16px;
 }
 
 .rule-card {
@@ -258,15 +291,21 @@ select:focus {
   gap: 8px;
 }
 
+/* Kept small and quiet on purpose — a category label, not the main content
+   of the card. What it means lives in the rule-creation modal instead (see
+   .hint-toggle / .rule-type-hint) — hover here wasn't discoverable and got
+   clipped by the panel's scroll container. */
 .rule-type-tag {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--teal);
-  background: var(--teal-soft);
-  padding: 3px 8px;
-  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
 }
 
+/* The natural-language sentence is the primary thing a person reads on
+   this card — leads the card (rendered first, above the metadata row)
+   rather than relying on size to stand out. */
 .rule-description,
 .notification-message {
   font-size: 14px;
@@ -277,17 +316,19 @@ select:focus {
 .rule-card-bottom {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-
-.rule-recipient {
-  font-size: 12px;
-  color: var(--text-muted);
+  justify-content: flex-end;
 }
 
 .notification-time {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.notification-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .empty-state {
@@ -321,18 +362,44 @@ select:focus {
   color: var(--severity-low-text);
 }
 
-.severity-input {
+.severity-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.severity-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 600;
-  transition: background 0.15s ease;
+  color: var(--text-muted);
+  cursor: pointer;
 }
-.severity-input--high {
-  background: var(--severity-high-bg);
+
+.severity-option input {
+  width: auto;
 }
-.severity-input--mid {
-  background: var(--severity-mid-bg);
+
+.severity-option:has(input:checked) {
+  border-color: transparent;
 }
-.severity-input--low {
+.severity-option--low:has(input:checked) {
   background: var(--severity-low-bg);
+  color: var(--severity-low-text);
+}
+.severity-option--mid:has(input:checked) {
+  background: var(--severity-mid-bg);
+  color: var(--severity-mid-text);
+}
+.severity-option--high:has(input:checked) {
+  background: var(--severity-high-bg);
+  color: var(--severity-high-text);
 }
 
 .btn-icon {
@@ -432,6 +499,34 @@ select:focus {
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Click, not hover — hover on a tag wasn't discoverable and got clipped by
+   a scroll container; a labeled, clickable "what's this?" is easy to find
+   and works the same on touch. */
+.hint-toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--teal);
+}
+.hint-toggle:hover {
+  text-decoration: underline;
+}
+
+.rule-type-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+  line-height: 1.4;
 }
 
 .rule-preview {

@@ -16,6 +16,7 @@ class Router:
     async def dispatch(self, notification: Notification) -> None:
         row = NotificationRow(
             rule_id=uuid.UUID(notification.rule_id),
+            rule_type=notification.rule_type,
             recipient_id=notification.recipient_id,
             message=notification.message,
             severity=notification.severity,

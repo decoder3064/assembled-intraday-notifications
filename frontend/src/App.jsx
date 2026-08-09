@@ -11,6 +11,7 @@ export default function App() {
   const [resolvedNotifications, setResolvedNotifications] = useState([]);
   // null = closed, "new" = create form, a rule object = editing that rule
   const [formTarget, setFormTarget] = useState(null);
+  const [showResolved, setShowResolved] = useState(false);
 
   const refresh = useCallback(async () => {
     setRules(await listRules());
@@ -50,14 +51,16 @@ export default function App() {
           </div>
           <NotificationFeed notifications={activeNotifications} resolved={false} onChanged={refresh} />
         </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Resolved</h2>
-          </div>
-          <NotificationFeed notifications={resolvedNotifications} resolved={true} onChanged={refresh} />
-        </section>
       </main>
+
+      <section className="panel panel-resolved">
+        <button className="resolved-toggle" onClick={() => setShowResolved((v) => !v)} aria-expanded={showResolved}>
+          <span>
+            {showResolved ? "▾" : "▸"} Resolved ({resolvedNotifications.length})
+          </span>
+        </button>
+        {showResolved && <NotificationFeed notifications={resolvedNotifications} resolved={true} onChanged={refresh} />}
+      </section>
 
       {formTarget && (
         <Modal title={formTarget === "new" ? "Create a rule" : "Edit rule"} onClose={closeForm}>
