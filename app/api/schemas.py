@@ -3,10 +3,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-# This system is scoped to one team with one team lead (see decisions.md) —
-# every rule notifies the same recipient, so there's nothing for a rule
-# author to choose here. The column survives in the DB for schema stability;
-# only the API contract drops it.
 DEFAULT_RECIPIENT_ID = "lead_maria"
 
 

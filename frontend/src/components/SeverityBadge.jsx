@@ -4,9 +4,8 @@ export function tierFor(severity) {
   return "low";
 }
 
-// A person doesn't need to think in a 1–10 scale — three levels is plenty.
-// The number still exists underneath (storage/sort order, unchanged), these
-// are just representative values that land in the matching tierFor() bucket.
+// Representative values landing in each tierFor() bucket — storage stays
+// a 1-10 int, the UI only ever shows Low/Medium/High.
 export const SEVERITY_LEVELS = [
   { value: 2, tier: "low", label: "Low" },
   { value: 5, tier: "mid", label: "Medium" },

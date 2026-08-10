@@ -59,8 +59,6 @@ async def delete_rule(rule_id: uuid.UUID, session: AsyncSession = Depends(get_se
     if row is None:
         raise HTTPException(status_code=404, detail="rule not found")
 
-    # The database handles cleanup on delete: rule_state rows (unused today)
-    # cascade away, notification rows survive with rule_id set to NULL, so
-    # notification history is preserved even after the rule is gone.
+    # Notification history survives (rule_id set to NULL, not cascaded).
     await session.delete(row)
     await session.commit()

@@ -1,7 +1,5 @@
 def format_duration(total_seconds: float) -> str:
-    """130 -> "2 min 10 sec", 120 -> "2 mins", 35 -> "35 sec" — people don't
-    think in raw seconds, so notification text should read in the units a
-    person would actually use."""
+    """Turns a duration in seconds into a readable string, e.g. 130 -> "2 min 10 sec"."""
     total_seconds = int(total_seconds)
     hours, remainder = divmod(total_seconds, 3600)
     minutes, seconds = divmod(remainder, 60)

@@ -27,6 +27,35 @@ flowchart LR
 - **Router** — decides who gets notified, persists the notification, hands it to delivery (console for now).
 - **Rules live in Postgres, not in code** — changing a threshold is a form, not a deploy. The Engine keeps its own in-memory copy, refreshed from the database every 5 seconds, so a rule created through the frontend takes effect without restarting anything.
 
+## Data model
+
+**`rules`**
+
+| column | type | notes |
+|---|---|---|
+| id | uuid | |
+| rule_type | text | one of the 9 catalog values, checked against a registry in code, not a DB enum — adding a type is a code change, not a migration |
+| scope | jsonb | what the rule watches, e.g. `{"queue_id": "billing"}` or `{"agent_ids": [...]}` |
+| params | jsonb | rule-type-specific thresholds, e.g. `{"threshold": 20}` |
+| recipient_id | text | always the one team lead (see Scope) — kept as a generic person id rather than removed, so multi-recipient support later is a small change, not a rewrite |
+| description | text | auto-rendered from a per-rule-type template, not typed freely |
+| severity | int | shown as Low/Medium/High in the UI, stored as an int |
+| enabled | boolean | |
+| created_at, updated_at | timestamp | |
+
+**`notifications`** — the output log, and what the notifications panel reads from.
+
+| column | type | notes |
+|---|---|---|
+| id | uuid | |
+| rule_id | uuid → rules.id, nullable | set to null (not cascaded) if the rule is later deleted, so notification history survives |
+| rule_type | text | snapshotted at creation time, so it also survives the rule being deleted |
+| recipient_id | text | |
+| message | text | rendered from the rule's message template plus the triggering event's live data |
+| severity | int | |
+| resolved | boolean | |
+| sent_at | timestamp | |
+
 ## Rule catalog
 
 9 rule types, each reacting to a different signal:

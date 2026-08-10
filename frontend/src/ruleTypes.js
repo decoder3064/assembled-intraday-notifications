@@ -1,10 +1,6 @@
 import { formatAgentList, agentsSubject } from "./knownEntities";
 
-// Stored fractions (0.07) round-trip through JS floating-point math when
-// converted back to a whole-number percent for display (0.07 * 100 ===
-// 7.000000000000001) — round to strip that noise. Safe here specifically
-// because percent fields are only ever whole numbers by design (the form
-// input doesn't allow decimals).
+// Rounded to strip floating-point noise (0.07 * 100 === 7.000000000000001).
 const pct = (fraction) => Math.round((fraction ?? 0) * 100);
 
 export const RULE_TYPES = {
