@@ -15,8 +15,9 @@ class TeamAdherenceCapacityRule(Rule):
 
     def carry_over_state(self, previous: Rule | None) -> None:
         if isinstance(previous, TeamAdherenceCapacityRule):
-            self._violating_agents = previous._violating_agents
-            self._last_seen = previous._last_seen
+            scoped_ids = {a.strip() for a in self.scope["agent_ids"]}
+            self._violating_agents = previous._violating_agents & scoped_ids
+            self._last_seen = {k: v for k, v in previous._last_seen.items() if k in scoped_ids}
 
     def entity_key(self, event: Event) -> str | None:
         if event.type != "adherence_check" or event.agent_id.strip() not in {
