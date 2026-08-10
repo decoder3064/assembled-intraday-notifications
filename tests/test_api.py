@@ -1,6 +1,8 @@
 from httpx import ASGITransport, AsyncClient
 
 from app.api.main import app
+from app.engine.engine import Engine
+from app.engine.rules.queue_backlog import QueueBacklogRule
 
 
 async def test_create_and_list_rule(clean_db):
@@ -45,6 +47,28 @@ async def test_update_rule_can_disable_it(clean_db):
         response = await client.patch(f"/rules/{created['id']}", json={"enabled": False})
         assert response.status_code == 200
         assert response.json()["enabled"] is False
+
+
+async def test_delete_rule_evicts_it_from_the_running_engine_immediately(clean_db):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        created = (await client.post("/rules", json={
+            "rule_type": "queue_backlog", "scope": {"queue_id": "billing"},
+            "params": {"threshold": 20}, "recipient_id": "lead_maria",
+            "severity": 4, "description": "...",
+        })).json()
+
+        # Simulate the poller having already picked this rule up.
+        app.state.engine = Engine(rules=[
+            QueueBacklogRule(rule_id=created["id"], scope={"queue_id": "billing"}, params={"threshold": 20},
+                              recipient_id="lead_maria", severity=4)
+        ])
+
+        response = await client.delete(f"/rules/{created['id']}")
+        assert response.status_code == 204
+
+        # Must not wait for the next 5s poll — a stale rule firing in that
+        # window would crash on a foreign-key violation when notified.
+        assert app.state.engine.rules == []
 
 
 async def test_list_notifications_starts_empty(clean_db):

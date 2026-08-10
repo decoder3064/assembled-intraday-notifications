@@ -3,9 +3,9 @@ from app.engine.rules.queue_backlog import QueueBacklogRule
 from app.ingestor.ingestor import Ingestor
 
 
-def _snapshot(event_id, tickets_waiting, queue_id="billing"):
+def _snapshot(event_id, tickets_waiting, queue_id="billing", ts="2026-05-26T09:15:00Z"):
     return {
-        "event_id": event_id, "ts": "2026-05-26T09:15:00Z", "type": "queue_snapshot",
+        "event_id": event_id, "ts": ts, "type": "queue_snapshot",
         "queue_id": queue_id, "tickets_waiting": tickets_waiting, "longest_wait_sec": 90,
         "sla_target_sec": 120, "agents_available": 2, "agents_on_call": 3,
         "volume_last_15m": 15, "volume_forecast_next_15m": 20,
@@ -87,6 +87,37 @@ def test_set_rules_replaces_the_active_rule_list():
 
     engine.set_rules([rule_b])
     assert engine.rules == [rule_b]
+
+
+def test_a_misconfigured_rule_does_not_stop_other_rules_from_evaluating():
+    broken_rule = QueueBacklogRule(
+        rule_id="rule_broken", scope={"queue_id": "billing"}, params={},  # missing required "threshold"
+        recipient_id="lead_maria", severity=4,
+    )
+    ingestor = Ingestor()
+    engine = Engine(rules=[broken_rule, _rule(threshold=20)])
+
+    notifications = engine.on_event(ingestor.process(_snapshot("evt_1", tickets_waiting=25)))
+
+    assert len(notifications) == 1
+    assert notifications[0].rule_id == "rule_1"
+
+
+def test_late_arriving_snapshot_does_not_reset_firing_state():
+    ingestor = Ingestor()
+    engine = Engine(rules=[_rule(threshold=20)])
+
+    notifications = engine.on_event(ingestor.process(_snapshot("evt_1", tickets_waiting=25, ts="2026-05-26T09:20:00Z")))
+    assert len(notifications) == 1  # breaches, fires
+
+    # A recovery snapshot arrives late, timestamped before the breach above.
+    notifications = engine.on_event(ingestor.process(_snapshot("evt_2", tickets_waiting=5, ts="2026-05-26T09:10:00Z")))
+    assert notifications == []
+
+    # Still breaching per the real (later) state — must not re-fire, since the
+    # late arrival above should have been ignored rather than resetting state.
+    notifications = engine.on_event(ingestor.process(_snapshot("evt_3", tickets_waiting=30, ts="2026-05-26T09:25:00Z")))
+    assert notifications == []
 
 
 def test_no_repeat_alert_survives_a_rule_refresh_with_the_same_rule_id():
