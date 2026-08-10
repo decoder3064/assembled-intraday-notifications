@@ -6,19 +6,16 @@ import { tierFor, SEVERITY_LEVELS } from "./SeverityBadge";
 
 function initialScopeFor(rule) {
   if (!rule) return {};
-  // Scope values are already stored in the exact shape the controls need —
-  // arrays for "agents" checkboxes, plain strings for "queue"/"agent"
-  // dropdowns — so no conversion is needed on the way in.
   return rule.scope;
 }
 
 function initialParamsFor(rule) {
   if (!rule) return {};
   const config = RULE_TYPES[rule.rule_type];
-  // Stored percent fields are fractions (0.8); the input shows whole
-  // numbers (80), so convert back on the way in, mirroring the /100 on submit.
+  // Percent fields are stored as fractions (0.8), shown as whole numbers
+  // (80). Rounded to avoid floating-point noise (e.g. 7.000000000000001).
   return Object.fromEntries(
-    config.paramsFields.map((f) => [f.name, f.isPercent ? rule.params[f.name] * 100 : rule.params[f.name]])
+    config.paramsFields.map((f) => [f.name, f.isPercent ? Math.round(rule.params[f.name] * 100) : rule.params[f.name]])
   );
 }
 
@@ -54,11 +51,7 @@ export default function RuleForm({ onCreated, onCancel, initialRule }) {
     setSeverity(RULE_TYPES[nextType].defaultSeverity);
   };
 
-  // Normalized once, used for both the live preview and the submit payload.
-  // "agents" fields are already a real array (built by the checkboxes);
-  // "queue"/"agent" fields are already an exact value (chosen from a
-  // dropdown, so there's nothing to typo) — no string parsing needed here
-  // at all, unlike the old free-text version of this form.
+  // Normalized once, shared by the live preview and the submit payload.
   const normalizedScope = Object.fromEntries(
     config.scopeFields.map((f) => [f.name, f.kind === "agents" ? scope[f.name] || [] : scope[f.name] || ""])
   );

@@ -5,10 +5,6 @@ from app.ingestor.schemas import Event
 
 
 class AdherenceEscalatedRule(Rule):
-    """Same underlying violation type as a self-nudge would check, but a longer threshold
-    and the team lead as recipient — for when it's stopped being 'forgot to
-    switch a toggle' and become something the team needs to react to."""
-
     rule_type = "adherence_escalated"
 
     def entity_key(self, event: Event) -> str | None:

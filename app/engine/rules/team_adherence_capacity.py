@@ -3,10 +3,8 @@ from app.ingestor.schemas import Event
 
 
 class TeamAdherenceCapacityRule(Rule):
-    """Aggregates violation state across agents itself, since no single
-    adherence_check event knows about anyone but itself. carry_over_state()
-    preserves that tally (and last-seen timestamps, for the late-event
-    guard) across a rule-cache refresh."""
+    """Unlike the other rules, this one keeps its own state across events —
+    no single adherence_check knows about more than one agent."""
 
     rule_type = "team_adherence_capacity"
 

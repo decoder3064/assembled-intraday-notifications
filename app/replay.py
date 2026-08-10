@@ -7,8 +7,8 @@ from app.ingestor.ingestor import Ingestor
 
 def replay_file(path: str, engine: Engine) -> list[Notification]:
     """Feed a JSONL event file through the ingestor and engine, in file
-    order, advancing a monotonic clock so a late or duplicate event can
-    never move "now" backward for tick-based rules."""
+    order. Tracks the latest event time seen so far, so a late or
+    duplicate event can't move time backward for tick-based rules."""
     ingestor = Ingestor()
     notifications: list[Notification] = []
     now: datetime | None = None

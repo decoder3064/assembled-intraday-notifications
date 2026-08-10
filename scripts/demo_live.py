@@ -43,7 +43,7 @@ def run(speed: float, base_url: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Replay the sample event feed against a running server, using its real rules and database.")
-    parser.add_argument("--speed", type=float, default=30.0, help="speed-up factor; 30 compresses the ~90 real minutes into ~3 demo minutes")
+    parser.add_argument("--speed", type=float, default=9.0, help="speed-up factor; 9 compresses the ~90 real minutes into ~10 demo minutes")
     parser.add_argument("--base-url", default="http://127.0.0.1:8020")
     args = parser.parse_args()
     run(args.speed, args.base_url)

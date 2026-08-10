@@ -1,61 +1,151 @@
 # Intraday Notification System
 
-Assembled take-home — a system that watches live contact-center events (queue health, agent state, adherence) and notifies the right person when something needs attention, without becoming noise.
+Watches live contact-center data (queue health, agent status, schedule adherence) and notifies a team lead when something needs attention — without becoming noise.
 
-- Design spec: [`docs/superpowers/specs/2026-08-05-intraday-notification-system-design.md`](docs/superpowers/specs/2026-08-05-intraday-notification-system-design.md)
-- Decision log / reasoning, including the full implementation log (for the walkthrough — this is the most up-to-date narrative): [`decisions.md`](decisions.md)
-- Sample data: [`data/events.txt`](data/events.txt)
+## Scope
 
-## What's built
+Built for the **team lead** overseeing one team — queue health, agent status, and schedule adherence, all in one place.
 
-- **Ingestor** (`app/ingestor/`) — validates incoming events, drops duplicates, normalizes inconsistent data.
-- **Engine** (`app/engine/`) — evaluates events against rules. 9 rule types implemented: reactive (`queue_backlog`, `sla_risk`, `sla_breach`, `volume_surge`, `zero_coverage`, `adherence_escalated`), duration-based (`long_call`, checked on a timer since nothing reports an in-progress call's length), and one aggregate (`team_adherence_capacity`, tracks violations across multiple agents/events, with its own state that survives the rule-cache refresh — see `decisions.md`). Rules only notify on the ok→firing transition, not on every event. (A 10th type, `adherence_self` — a private nudge to an agent about their own schedule — was built, then deliberately removed once the scope narrowed to team-lead-only; see `decisions.md`.)
-- **Persistence** (`app/persistence/`) — `rules`, `rule_state`, `notifications` tables in Postgres.
-- **Router** (`app/router/`) — persists notifications and delivers them (console stub for now).
-- **API** (`app/api/`) — full CRUD on rules (create/list/edit/delete), notifications (list/resolve/unresolve/delete), and a `/events` endpoint that feeds the running engine. A background poller refreshes the engine's rules from the database every 5 seconds, so a rule created while the server is running takes effect without a restart. The app creates its own database schema on startup, so it works against a genuinely empty database.
-- **Frontend** (`frontend/`) — React UI, three panels (Active rules / Notifications / Resolved). Create and edit rules through one modal form with fields that change based on rule type; resolve, undo, and delete notifications. Visual design pulled from Assembled's actual site (colors, font) rather than invented.
+## Architecture
 
-## Running it
+```mermaid
+flowchart LR
+    Events[Events] --> Ingestor[Ingestor]
+    Ingestor --> Engine[Engine]
+    Engine --> Router[Router]
+    Router --> Notifications[("Notifications<br/>(Postgres)")]
 
-Start Postgres:
-```bash
-docker compose up -d db
+    Frontend[Frontend] -->|create / edit rules| API[API]
+    API --> Rules[("Rules<br/>(Postgres)")]
+    Rules -->|refreshed every 5s| Engine
+
+    Notifications -->|polled| Frontend
 ```
 
-Run the backend test suite (uses its own isolated test database, separate from whatever you're running locally):
+- **Ingestor** — validates and normalizes incoming events, drops duplicates.
+- **Engine** — checks events against the current rules. Also runs a periodic check for rules that depend on elapsed time rather than a new event arriving (e.g. "this agent has been on one call for 20 minutes" — nothing tells you a call is *still* going, so the engine checks in on its own).
+- **Router** — decides who gets notified, persists the notification, hands it to delivery (console for now).
+- **Rules live in Postgres, not in code** — changing a threshold is a form, not a deploy. The Engine keeps its own in-memory copy, refreshed from the database every 5 seconds, so a rule created through the frontend takes effect without restarting anything.
+
+## Data model
+
+**`rules`**
+
+| column | type | notes |
+|---|---|---|
+| id | uuid | |
+| rule_type | text | one of the 9 catalog values, checked against a registry in code, not a DB enum — adding a type is a code change, not a migration |
+| scope | jsonb | what the rule watches, e.g. `{"queue_id": "billing"}` or `{"agent_ids": [...]}` |
+| params | jsonb | rule-type-specific thresholds, e.g. `{"threshold": 20}` |
+| recipient_id | text | always the one team lead (see Scope) — kept as a generic person id rather than removed, so multi-recipient support later is a small change, not a rewrite |
+| description | text | auto-rendered from a per-rule-type template, not typed freely |
+| severity | int | shown as Low/Medium/High in the UI, stored as an int |
+| enabled | boolean | |
+| created_at, updated_at | timestamp | |
+
+**`notifications`** — the output log, and what the notifications panel reads from.
+
+| column | type | notes |
+|---|---|---|
+| id | uuid | |
+| rule_id | uuid → rules.id, nullable | set to null (not cascaded) if the rule is later deleted, so notification history survives |
+| rule_type | text | snapshotted at creation time, so it also survives the rule being deleted |
+| recipient_id | text | |
+| message | text | rendered from the rule's message template plus the triggering event's live data |
+| severity | int | |
+| resolved | boolean | |
+| sent_at | timestamp | |
+
+## Rule catalog
+
+9 rule types, each reacting to a different signal:
+
+| Rule | Fires when |
+|---|---|
+| Queue backlog | Too many tickets waiting in a queue |
+| SLA at risk | A wait is getting close to the promised max wait time |
+| SLA breached | A wait has already passed the promised max |
+| Volume surge | Call volume is running well above what was forecasted |
+| Zero coverage | Nobody's free in a queue and tickets are waiting |
+| Occupancy | Most of a queue's agents are tied up on calls, even before a backlog forms |
+| Long call | One agent's been on the same call too long |
+| Escalated adherence | One agent's been off schedule too long |
+| Team adherence capacity | Too many agents are off schedule at the same time |
+
+A rule only notifies once, on the transition from "fine" to "a problem" — not repeatedly while the problem is ongoing.
+
+## Known, deliberate gaps
+
+- **No-repeat-alert state is in-memory only.** A restart can cause one duplicate notification for whatever was already firing at that moment.
+- **Occupancy trusts its input.** It reports whatever the incoming event says, with no independent way to verify it — that verification is properly the job of the actual phone system, not a downstream alerting layer.
+
+---
+
+## Setup
+
+### Ports
+
+| Service | URL |
+|---|---|
+| Frontend | `http://localhost:5190` |
+| Backend API | `http://localhost:8020` (Swagger docs at `/docs`) |
+| Postgres | `localhost:5433` (Docker) or `localhost:5432` (local install) |
+
+### Prerequisites
+
+- **Docker** (simplest path, below) — or, to run without it: **Python 3.12+** + **[uv](https://docs.astral.sh/uv/getting-started/installation/)** (`curl -LsSf https://astral.sh/uv/install.sh | sh`, or `brew install uv`), **Node.js 22+** + npm, and **Postgres**
+
+### Run it: with Docker
+
+One command starts everything — Postgres, the backend, and the frontend:
 ```bash
-uv run pytest -v
+docker compose up --build
+```
+Frontend: `http://localhost:5190`. API: `http://localhost:8020`.
+
+### Run it: without Docker
+
+Install Postgres 16 locally if you don't have it:
+```bash
+brew install postgresql@16 && brew services start postgresql@16   # macOS
+# or: sudo apt install postgresql && sudo systemctl start postgresql
 ```
 
-Run the frontend test suite:
+Create the database and user the app expects:
 ```bash
-cd frontend && npm test
+createuser app -P    # set password to "app" when prompted
+createdb notifications -O app
 ```
 
-Run the API:
+Local Postgres usually listens on port 5432, not 5433 (the port the Docker setup uses to avoid conflicting with a local install) — point the app at wherever yours actually runs:
 ```bash
+export DATABASE_URL="postgresql+asyncpg://app:app@localhost:5432/notifications"
 uv run uvicorn app.api.main:app --port 8020 --reload
 ```
-Swagger UI is available at `http://127.0.0.1:8020/docs` for creating/editing rules without the frontend.
 
-Run the frontend:
+Then, same as above:
 ```bash
 cd frontend && npm install && npm run dev
 ```
-Opens on `http://localhost:5190` — CORS on the backend is configured for exactly that origin. If you change either port, update both `app/api/main.py` (CORS origin) and `frontend/vite.config.js` (dev server port) / `frontend/src/api.js` (`BASE_URL`) to match. Ports 8020/5190 were picked because 8000/5173 were already in use during development — pick whatever's free on your machine.
 
-Two demo scripts, both replaying `data/events.txt` at a configurable pace (`--speed`, default 30x — compresses the ~90 real minutes into ~3):
-- `uv run python scripts/demo_live.py --base-url http://127.0.0.1:8020` — talks to the real running API and database. Create a rule first (via the frontend or Swagger UI) for it to have something to evaluate — matching the real sample data means a `queue_backlog` rule on queue `billing`, or a `long_call` rule with agent ids `a_31`/`a_11`.
-  - **Restart the API server before each re-run.** The ingestor's duplicate-event check lives only in server memory, keyed by each event's fixed ID. Once a run has sent an event_id, the server remembers it for as long as that process stays up — so replaying the same file again against a server that already saw it gets silently treated as duplicates (`200 OK`, zero notifications, no error). Restarting the server (or touching a watched file so `--reload` restarts it) clears that memory for a clean run.
-- `uv run python scripts/demo_offline.py` — self-contained, no server or database needed, uses a couple of hardcoded example rules.
+### Tests
+```bash
+uv run pytest -v            # backend
+cd frontend && npm test     # frontend
+```
 
-## Demo rule sets
+### See it work
 
-`demo_live.py` only produces notifications for rules that actually exist when it runs — the rules below were checked line-by-line against the real timestamps in `data/events.txt`, so each one is guaranteed to fire, and roughly when. Pick **one** set (not both — 4 rules are shared between them, so creating both would create duplicates of those 4), run `docker compose up -d db` and the API server, paste the block, then run `uv run python scripts/demo_live.py --base-url http://127.0.0.1:8020`.
+Two scripts replay the sample data (`data/events.txt`) at a sped-up pace:
 
-### Set A — billing under pressure, one of every rule type
+- **`uv run python scripts/demo_offline.py`** — fully self-contained. No server, no database. Fastest way to confirm the rule logic works.
+- **`uv run python scripts/demo_live.py --base-url http://127.0.0.1:8020`** — talks to your actual running API and database. Create a rule first (in the UI or Swagger), then run this and watch notifications appear live in the frontend.
 
-Why: `billing` is the queue that actually has a bad morning in this dataset — it's the one scenario that shows every reactive rule type escalating on a single queue (coverage drops to zero, occupancy maxes out, the SLA warning fires and then the SLA actually breaches), plus one agent on an unusually long call, one agent whose off-schedule time escalates to the team lead, and the multi-agent aggregate rule. This set has exactly one instance of all 9 implemented rule types, so a single run demonstrates the full catalog.
+**Restart the API before re-running `demo_live.py`.** Duplicate-event detection lives in server memory — replaying the same file against a server that already saw it produces zero new notifications, silently.
+
+#### Ready-to-paste rule set
+
+Creates one instance of every rule type, scoped to the `billing` queue, guaranteed to fire against the real sample data (verified against the actual timestamps in `data/events.txt`):
 
 ```bash
 curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"zero_coverage","scope":{"queue_id":"billing"},"params":{},"severity":9,"description":"Notify me when nobody'"'"'s free in billing and tickets are waiting"}'
@@ -77,45 +167,24 @@ curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d 
 curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"volume_surge","scope":{"queue_id":"billing"},"params":{"pct_over_forecast":0.1},"severity":9,"description":"Notify me when billing'"'"'s volume is running well above what was forecasted (>10%)"}'
 ```
 
-Fire order (at `--speed 30`, ~3 min total): zero coverage + SLA risk ~0:30 → queue backlog ~0:50 → SLA breach + long call ~1:00 → escalated adherence ~1:50 → team adherence capacity ~2:00.
-
-**`volume_surge` is the one exception — it's created above but won't fire during the replay.** Checked it against all three queues across the whole file: actual 15-minute volume never once exceeds the forecast anywhere in this dataset (forecasts always run a bit hot), so no threshold makes it trigger off real data. It's still worth creating so it shows up as a real, working rule in the Active Rules panel — to actually see it fire, send one synthetic event during the demo:
+At the default `--speed 9` (~10 demo minutes for ~90 real minutes), everything fires within the first 7 minutes except `volume_surge` — real call volume never exceeds forecast anywhere in the sample data, so that one rule is correctly implemented but can't be proven from the replay alone. To see it fire, send one synthetic event:
 ```bash
 curl -X POST http://127.0.0.1:8020/events -H "Content-Type: application/json" -d '{"event_id":"evt_demo_surge","ts":"2026-05-26T09:20:00Z","type":"queue_snapshot","queue_id":"billing","tickets_waiting":5,"longest_wait_sec":30,"sla_target_sec":120,"agents_available":2,"agents_on_call":2,"volume_last_15m":40,"volume_forecast_next_15m":20}'
 ```
 
-### Set B — spread across all three queues
+### Project layout
 
-Why: Set A makes it look like this only works for `billing`. This set proves the same rule types generalize to `tier_2` and `vip` too — including a risk→breach escalation on `tier_2` (the same pattern billing shows), and one rule on `vip`, which barely misbehaves in this dataset at all (worth saying out loud in the demo — a queue that mostly stays healthy is a real, useful case to show, not just the queues that are on fire).
-
-```bash
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"zero_coverage","scope":{"queue_id":"billing"},"params":{},"severity":9,"description":"Notify me when nobody'"'"'s free in billing and tickets are waiting"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"sla_breach","scope":{"queue_id":"billing"},"params":{},"severity":9,"description":"Notify me when billing has already missed its SLA"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"long_call","scope":{"agent_ids":["a_11"]},"params":{"duration_min":20},"severity":9,"description":"Notify me if any of Agent 11 has been on one call for over 20 minutes"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"sla_risk","scope":{"queue_id":"tier_2"},"params":{"pct_of_sla":0.75},"severity":5,"description":"Warn me when tier_2 is close to missing its SLA (75%)"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"queue_backlog","scope":{"queue_id":"tier_2"},"params":{"threshold":3},"severity":5,"description":"Notify me when tier_2 has more than 3 tickets waiting"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"sla_risk","scope":{"queue_id":"vip"},"params":{"pct_of_sla":0.5},"severity":5,"description":"Warn me when vip is close to missing its SLA (50%)"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"sla_breach","scope":{"queue_id":"tier_2"},"params":{},"severity":9,"description":"Notify me when tier_2 has already missed its SLA"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"occupancy","scope":{"queue_id":"tier_2"},"params":{"occupancy_threshold":0.8},"severity":5,"description":"Notify me when tier_2'"'"'s occupancy crosses 80%"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"team_adherence_capacity","scope":{"agent_ids":["a_19","a_88"]},"params":{"count_threshold":1},"severity":9,"description":"Notify me when more than 1 of Agent 19 and Agent 88 are off-schedule at the same time"}'
-
-curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"adherence_escalated","scope":{"agent_ids":["a_88"]},"params":{"duration_min":10},"severity":9,"description":"Notify me if any of Agent 88 has been off-schedule for over 10 minutes and hasn'"'"'t fixed it"}'
+```
+app/ingestor/     validates and normalizes incoming events
+app/engine/       rule evaluation
+app/engine/rules/ the 9 rule types
+app/persistence/  database models
+app/router/       delivers notifications (console for now)
+app/api/          FastAPI app
+frontend/         React UI
+data/events.txt   sample event feed used by the demo scripts
 ```
 
-Fire order: zero coverage (billing) + SLA breach (billing) + long call ~1:00 → SLA risk (tier_2) + queue backlog (tier_2) ~1:30 → SLA risk (vip) ~1:38 → SLA breach (tier_2) + occupancy (tier_2) + team adherence capacity ~2:00 → escalated adherence (Agent 88) ~2:30.
+## AI usage
 
-`volume_surge` isn't in Set B — see the note under Set A above for why it can't fire off real replay data regardless of which set it's in, and the synthetic event that demos it anyway.
-
-## Not built yet
-
-- `rule_state` isn't persisted — see the comment on `RuleStateRow` in `app/persistence/models.py` for why, and what a production fix would look like.
-- The more general "diff the rule-cache poller instead of a per-rule hook" fix — see `decisions.md` for the reasoning on why the narrower fix was chosen instead.
-- Auth, multi-tenancy, and real Slack/email delivery — explicitly out of scope per the prompt.
+Built with Claude Code for architecture discussion, implementation, and documentation, which I reviewed and approved throughout. Used ChatGPT for research on the domain and the end user. For product decisions I grounded my thinking in a real conversation, not just AI or the prompt: I interviewed a team lead at a customer service company (my cousin) to understand what actually matters day to day. Every scope decision, what to build, what to cut, and every design choice was mine, made after reviewing what was proposed.

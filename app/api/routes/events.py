@@ -20,7 +20,7 @@ async def ingest_event(payload: dict, request: Request, session: AsyncSession = 
         raise HTTPException(status_code=422, detail=str(e))
 
     if event is None:
-        return {"notifications": []}  # duplicate, dropped same as production
+        return {"notifications": []}  # duplicate event, already processed
 
     notifications = engine.on_event(event)
 
