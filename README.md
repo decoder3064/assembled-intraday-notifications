@@ -52,8 +52,8 @@ flowchart LR
 | rule_type | text | snapshotted at creation time, so it also survives the rule being deleted |
 | recipient_id | text | |
 | message | text | rendered from the rule's message template plus the triggering event's live data |
-| severity | int | |
-| resolved | boolean | |
+| severity | int | shown as Low/Medium/High in the UI, stored as an int |
+| resolved | boolean | defaults to false; set by the team lead marking it handled in the UI, not by the system |
 | sent_at | timestamp | |
 
 ## Rule catalog
@@ -77,7 +77,6 @@ A rule only notifies once, on the transition from "fine" to "a problem" — not 
 ## Known, deliberate gaps
 
 - **No-repeat-alert state is in-memory only.** A restart can cause one duplicate notification for whatever was already firing at that moment.
-- **Occupancy trusts its input.** It reports whatever the incoming event says, with no independent way to verify it — that verification is properly the job of the actual phone system, not a downstream alerting layer.
 
 ---
 
