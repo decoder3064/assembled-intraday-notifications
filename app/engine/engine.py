@@ -27,8 +27,16 @@ class Engine:
     def set_rules(self, rules: list[Rule]) -> None:
         old_by_id = {r.rule_id: r for r in self.rules}
         for new_rule in rules:
-            new_rule.carry_over_state(old_by_id.get(new_rule.rule_id))
+            try:
+                new_rule.carry_over_state(old_by_id.get(new_rule.rule_id))
+            except Exception:
+                # A misconfigured rule shouldn't stop every other rule from
+                # being loaded on this refresh.
+                logger.exception("rule %s failed to carry over state", new_rule.rule_id)
         self.rules = rules
+
+    def remove_rule(self, rule_id: str) -> None:
+        self.rules = [r for r in self.rules if r.rule_id != rule_id]
 
     def on_event(self, event: Event) -> list[Notification]:
         if event.type == "agent_state_change":

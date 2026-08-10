@@ -1,5 +1,6 @@
 from app.engine.engine import Engine
 from app.engine.rules.queue_backlog import QueueBacklogRule
+from app.engine.rules.team_adherence_capacity import TeamAdherenceCapacityRule
 from app.ingestor.ingestor import Ingestor
 
 
@@ -118,6 +119,40 @@ def test_late_arriving_snapshot_does_not_reset_firing_state():
     # late arrival above should have been ignored rather than resetting state.
     notifications = engine.on_event(ingestor.process(_snapshot("evt_3", tickets_waiting=30, ts="2026-05-26T09:25:00Z")))
     assert notifications == []
+
+
+def test_set_rules_isolates_a_rule_whose_carry_over_state_fails():
+    ok_rule = _rule(threshold=20)
+    broken_rule = TeamAdherenceCapacityRule(
+        rule_id="broken_tac", scope={}, params={"count_threshold": 1},  # missing "agent_ids"
+        recipient_id="lead_maria", severity=9,
+    )
+    engine = Engine(rules=[broken_rule])
+
+    # A refresh where broken_rule's own carry_over_state raises (KeyError on
+    # the missing scope key) must not stop ok_rule from being loaded too.
+    engine.set_rules([broken_rule, ok_rule])
+
+    assert engine.rules == [broken_rule, ok_rule]
+
+
+def test_remove_rule_does_not_invoke_carry_over_state_on_survivors():
+    calls = []
+
+    class SpyRule(QueueBacklogRule):
+        def carry_over_state(self, previous):
+            calls.append(previous)
+            super().carry_over_state(previous)
+
+    kept = SpyRule(rule_id="keep", scope={"queue_id": "billing"}, params={"threshold": 20},
+                    recipient_id="lead_maria", severity=4)
+    to_remove = _rule(threshold=5)
+    engine = Engine(rules=[kept, to_remove])
+
+    engine.remove_rule(to_remove.rule_id)
+
+    assert engine.rules == [kept]
+    assert calls == []
 
 
 def test_no_repeat_alert_survives_a_rule_refresh_with_the_same_rule_id():
