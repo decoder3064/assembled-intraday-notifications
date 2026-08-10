@@ -69,6 +69,30 @@ def test_call_ending_resets_the_tracked_state():
     assert engine.tick(now) == []
 
 
+def test_second_long_call_fires_again_after_the_first_one_ends():
+    ingestor = Ingestor()
+    engine = Engine(rules=[_rule(duration_min=45)])
+
+    engine.on_event(ingestor.process(_state_change("evt_1", "a_19", "on_call", "2026-05-26T09:00:00Z")))
+    first = engine.tick(datetime(2026, 5, 26, 9, 50, 0, tzinfo=timezone.utc))  # 50 min, breaches
+    assert len(first) == 1
+
+    engine.on_event(ingestor.process(
+        _state_change("evt_2", "a_19", "available", "2026-05-26T09:50:00Z", previous_state="on_call")
+    ))
+    # A tick while the agent is between calls is what actually resets the
+    # tracked state — in production the poller calls tick() continuously,
+    # not just at the moments a threshold might be crossed.
+    engine.tick(datetime(2026, 5, 26, 9, 55, 0, tzinfo=timezone.utc))
+
+    engine.on_event(ingestor.process(
+        _state_change("evt_3", "a_19", "on_call", "2026-05-26T10:00:00Z", previous_state="available")
+    ))
+    second = engine.tick(datetime(2026, 5, 26, 10, 50, 0, tzinfo=timezone.utc))  # a second 50-min call
+
+    assert len(second) == 1
+
+
 def test_agent_outside_scope_never_fires():
     ingestor = Ingestor()
     engine = Engine(rules=[_rule(duration_min=45, agent_ids=("a_31",))])  # rule only watches a_31

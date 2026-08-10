@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,7 +54,7 @@ async def update_rule(rule_id: uuid.UUID, payload: RuleUpdate, session: AsyncSes
 
 
 @router.delete("/{rule_id}", status_code=204)
-async def delete_rule(rule_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+async def delete_rule(rule_id: uuid.UUID, request: Request, session: AsyncSession = Depends(get_session)):
     row = await session.get(RuleRow, rule_id)
     if row is None:
         raise HTTPException(status_code=404, detail="rule not found")
@@ -62,3 +62,9 @@ async def delete_rule(rule_id: uuid.UUID, session: AsyncSession = Depends(get_se
     # Notification history survives (rule_id set to NULL, not cascaded).
     await session.delete(row)
     await session.commit()
+
+    # Evict immediately rather than waiting for the next poll — otherwise a
+    # stale in-memory rule can still fire in that window and crash the
+    # notification insert with a foreign-key violation.
+    engine = request.app.state.engine
+    engine.set_rules([r for r in engine.rules if r.rule_id != str(rule_id)])

@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime
 
 from app.engine.agent_state_tracker import AgentStateTracker
 from app.engine.rule import DurationRule, Rule
 from app.engine.rule_state import RuleStateTracker
 from app.ingestor.schemas import Event
+
+logger = logging.getLogger(__name__)
 
 
 class Notification:
@@ -33,12 +36,17 @@ class Engine:
 
         notifications = []
         for rule in self.rules:
-            entity_key = rule.entity_key(event)
-            if entity_key is None:
-                continue
-            violating = rule.is_violating(event)
-            if self.state.update(rule.rule_id, entity_key, violating):
-                notifications.append(Notification(rule, rule.render_message(event)))
+            try:
+                entity_key = rule.entity_key(event)
+                if entity_key is None:
+                    continue
+                violating = rule.is_violating(event)
+                if self.state.update(rule.rule_id, entity_key, violating, event.ts):
+                    notifications.append(Notification(rule, rule.render_message(event)))
+            except Exception:
+                # A misconfigured rule (e.g. a missing required param) shouldn't
+                # stop every other rule from evaluating against this event.
+                logger.exception("rule %s failed to evaluate event %s", rule.rule_id, event.event_id)
         return notifications
 
     def tick(self, now: datetime) -> list[Notification]:
@@ -47,12 +55,18 @@ class Engine:
             if not isinstance(rule, DurationRule):
                 continue
             for agent_id, (state, entered_at) in self.agent_states.all().items():
-                if state != rule.watched_state() or not rule.applies_to(agent_id):
-                    continue
-                seconds = (now - entered_at).total_seconds()
-                violating = rule.is_too_long(seconds)
-                if self.state.update(rule.rule_id, agent_id, violating):
-                    notifications.append(
-                        Notification(rule, rule.render_duration_message(agent_id, int(seconds)))
-                    )
+                try:
+                    if not rule.applies_to(agent_id):
+                        continue
+                    seconds = 0
+                    violating = False
+                    if state == rule.watched_state():
+                        seconds = (now - entered_at).total_seconds()
+                        violating = rule.is_too_long(seconds)
+                    if self.state.update(rule.rule_id, agent_id, violating, now):
+                        notifications.append(
+                            Notification(rule, rule.render_duration_message(agent_id, int(seconds)))
+                        )
+                except Exception:
+                    logger.exception("rule %s failed to evaluate agent %s", rule.rule_id, agent_id)
         return notifications
