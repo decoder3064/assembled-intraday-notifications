@@ -20,20 +20,21 @@ class TeamAdherenceCapacityRule(Rule):
             self._last_seen = {k: v for k, v in previous._last_seen.items() if k in scoped_ids}
 
     def entity_key(self, event: Event) -> str | None:
-        if event.type != "adherence_check" or event.agent_id.strip() not in {
+        agent_id = event.agent_id.strip()
+        if event.type != "adherence_check" or agent_id not in {
             a.strip() for a in self.scope["agent_ids"]
         }:
             return None
 
-        last = self._last_seen.get(event.agent_id)
+        last = self._last_seen.get(agent_id)
         if last is not None and event.ts < last:
             return "team"  # late-arriving event, older than what we already have — ignore it
 
-        self._last_seen[event.agent_id] = event.ts
+        self._last_seen[agent_id] = event.ts
         if event.in_violation:
-            self._violating_agents.add(event.agent_id)
+            self._violating_agents.add(agent_id)
         else:
-            self._violating_agents.discard(event.agent_id)
+            self._violating_agents.discard(agent_id)
 
         return "team"
 

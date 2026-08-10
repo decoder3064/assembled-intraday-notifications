@@ -66,5 +66,4 @@ async def delete_rule(rule_id: uuid.UUID, request: Request, session: AsyncSessio
     # Evict immediately rather than waiting for the next poll — otherwise a
     # stale in-memory rule can still fire in that window and crash the
     # notification insert with a foreign-key violation.
-    engine = request.app.state.engine
-    engine.set_rules([r for r in engine.rules if r.rule_id != str(rule_id)])
+    request.app.state.engine.remove_rule(str(rule_id))

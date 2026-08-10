@@ -144,6 +144,30 @@ def test_team_adherence_capacity_ignores_a_late_arriving_stale_event():
     assert "a_19" in rule._violating_agents
 
 
+def test_team_adherence_capacity_carry_over_keeps_a_whitespace_padded_agent_id():
+    ingestor = Ingestor()
+    rule = TeamAdherenceCapacityRule(
+        rule_id="r", scope={"agent_ids": ["a_19"]}, params={"count_threshold": 0},
+        recipient_id="lead_maria", severity=8,
+    )
+    engine = Engine(rules=[rule])
+
+    # The incoming event's agent_id has incidental whitespace.
+    engine.on_event(ingestor.process(_adherence("e1", " a_19")))
+    assert "a_19" in rule._violating_agents
+
+    # Simulate a rule-cache refresh (the poller, or an unrelated rule delete).
+    fresh_rule = TeamAdherenceCapacityRule(
+        rule_id="r", scope={"agent_ids": ["a_19"]}, params={"count_threshold": 0},
+        recipient_id="lead_maria", severity=8,
+    )
+    engine.set_rules([fresh_rule])
+
+    # Must survive the refresh, not get silently dropped by a stripped-vs-raw
+    # key mismatch between the carried-over state and the new scope.
+    assert engine.rules[0]._violating_agents == {"a_19"}
+
+
 def test_team_adherence_capacity_tally_survives_a_rule_cache_refresh():
     ingestor = Ingestor()
     rule = TeamAdherenceCapacityRule(
