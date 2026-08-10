@@ -16,9 +16,11 @@ function initialParamsFor(rule) {
   if (!rule) return {};
   const config = RULE_TYPES[rule.rule_type];
   // Stored percent fields are fractions (0.8); the input shows whole
-  // numbers (80), so convert back on the way in, mirroring the /100 on submit.
+  // numbers (80), so convert back on the way in, mirroring the /100 on
+  // submit. Rounded — fraction * 100 can land on 7.000000000000001 due to
+  // floating-point, and percent fields are only ever whole numbers anyway.
   return Object.fromEntries(
-    config.paramsFields.map((f) => [f.name, f.isPercent ? rule.params[f.name] * 100 : rule.params[f.name]])
+    config.paramsFields.map((f) => [f.name, f.isPercent ? Math.round(rule.params[f.name] * 100) : rule.params[f.name]])
   );
 }
 

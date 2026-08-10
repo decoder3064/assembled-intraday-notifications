@@ -17,9 +17,22 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://app:app@db:5432/notifications
     ports:
-      - "8000:8000"
+      - "8020:8000"
     volumes:
       - .:/app
+      - /app/.venv
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - app
+    environment:
+      VITE_API_URL: http://localhost:8020
+    ports:
+      - "5190:5190"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   pgdata:

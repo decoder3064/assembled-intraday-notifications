@@ -24,6 +24,25 @@ describe("RuleForm", () => {
     expect(api.createRule).toHaveBeenCalledWith(expect.objectContaining({ params: { pct_of_sla: 0.8 } }));
   });
 
+  it("pre-fills a clean whole number even when the stored fraction hits floating-point noise (e.g. 0.07 * 100)", () => {
+    render(
+      <RuleForm
+        onCreated={vi.fn()}
+        onCancel={vi.fn()}
+        initialRule={{
+          id: "r1",
+          rule_type: "occupancy",
+          scope: { queue_id: "tier_2" },
+          params: { occupancy_threshold: 0.07 },
+          recipient_id: "lead_maria",
+          severity: 5,
+        }}
+      />
+    );
+
+    expect(screen.getByLabelText(/occupancy threshold/i)).toHaveValue(7);
+  });
+
   it("pre-fills a whole-number percentage when editing an existing fraction-based rule", () => {
     render(
       <RuleForm

@@ -1,5 +1,12 @@
 import { formatAgentList, agentsSubject } from "./knownEntities";
 
+// Stored fractions (0.07) round-trip through JS floating-point math when
+// converted back to a whole-number percent for display (0.07 * 100 ===
+// 7.000000000000001) — round to strip that noise. Safe here specifically
+// because percent fields are only ever whole numbers by design (the form
+// input doesn't allow decimals).
+const pct = (fraction) => Math.round((fraction ?? 0) * 100);
+
 export const RULE_TYPES = {
   queue_backlog: {
     label: "Queue backlog",
@@ -17,7 +24,7 @@ export const RULE_TYPES = {
     scopeFields: [{ name: "queue_id", label: "Queue", kind: "queue" }],
     paramsFields: [{ name: "pct_of_sla", label: "Warn at this % of the SLA deadline", type: "number", isPercent: true }],
     describe: (scope, params) =>
-      `Warn me when ${scope.queue_id || "this queue"}'s longest wait reaches ${(params.pct_of_sla ?? 0) * 100}% of its SLA deadline`,
+      `Warn me when ${scope.queue_id || "this queue"}'s longest wait reaches ${pct(params.pct_of_sla)}% of its SLA deadline`,
   },
   sla_breach: {
     label: "SLA breached",
@@ -34,7 +41,7 @@ export const RULE_TYPES = {
     scopeFields: [{ name: "queue_id", label: "Queue", kind: "queue" }],
     paramsFields: [{ name: "pct_over_forecast", label: "Surge threshold, % over forecast", type: "number", isPercent: true }],
     describe: (scope, params) =>
-      `Notify me when ${scope.queue_id || "this queue"}'s call volume runs more than ${(params.pct_over_forecast ?? 0) * 100}% above what was forecasted`,
+      `Notify me when ${scope.queue_id || "this queue"}'s call volume runs more than ${pct(params.pct_over_forecast)}% above what was forecasted`,
   },
   zero_coverage: {
     label: "Zero coverage",
@@ -82,6 +89,6 @@ export const RULE_TYPES = {
     scopeFields: [{ name: "queue_id", label: "Queue", kind: "queue" }],
     paramsFields: [{ name: "occupancy_threshold", label: "Occupancy threshold %", type: "number", isPercent: true }],
     describe: (scope, params) =>
-      `Notify me when ${(params.occupancy_threshold ?? 0) * 100}% of ${scope.queue_id || "this queue"}'s agents are busy on calls`,
+      `Notify me when ${pct(params.occupancy_threshold)}% of ${scope.queue_id || "this queue"}'s agents are busy on calls`,
   },
 };

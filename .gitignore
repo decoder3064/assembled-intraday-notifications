@@ -11,3 +11,9 @@ frontend/dist/
 frontend/build/
 
 .DS_Store
+
+# Personal interview-prep notes — not meant for reviewers. Everything a
+# reviewer needs is consolidated into README.md instead.
+decisions.md
+LIMITATIONS.md
+docs/
