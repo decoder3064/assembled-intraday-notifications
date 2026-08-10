@@ -144,7 +144,7 @@ Two scripts replay the sample data (`data/events.txt`) at a sped-up pace:
 
 #### Ready-to-paste rule set
 
-Creates one instance of every rule type, scoped to the `billing` queue, guaranteed to fire against the real sample data (verified against the actual timestamps in `data/events.txt`):
+Creates one instance of every rule type, scoped to the `billing` queue. All but `volume_surge` are guaranteed to fire against the real sample data (verified against the actual timestamps in `data/events.txt`) — see below for why `volume_surge` needs a synthetic event instead.
 
 ```bash
 curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"zero_coverage","scope":{"queue_id":"billing"},"params":{},"severity":9,"description":"Notify me when nobody'"'"'s free in billing and tickets are waiting"}'
