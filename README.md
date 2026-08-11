@@ -166,7 +166,7 @@ curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d 
 curl -X POST http://127.0.0.1:8020/rules -H "Content-Type: application/json" -d '{"rule_type":"volume_surge","scope":{"queue_id":"billing"},"params":{"pct_over_forecast":0.1},"severity":9,"description":"Notify me when billing'"'"'s volume is running well above what was forecasted (>10%)"}'
 ```
 
-At the default `--speed 9` (~10 demo minutes for ~90 real minutes), everything fires within the first 7 minutes except `volume_surge`. The provided sample data just doesn't contain a volume spike — call volume never gets close to forecast in `data/events.txt`, so the rule is correctly implemented but has nothing to fire on there. To see it fire, send this one event by hand:
+At the default `--speed 18` (~5 demo minutes for ~90 real minutes), everything fires within the first ~3-4 minutes except `volume_surge`. The provided sample data just doesn't contain a volume spike — call volume never gets close to forecast in `data/events.txt`, so the rule is correctly implemented but has nothing to fire on there. To see it fire, send this one event by hand:
 ```bash
 curl -X POST http://127.0.0.1:8020/events -H "Content-Type: application/json" -d '{"event_id":"evt_demo_surge","ts":"2026-05-26T09:20:00Z","type":"queue_snapshot","queue_id":"billing","tickets_waiting":5,"longest_wait_sec":30,"sla_target_sec":120,"agents_available":2,"agents_on_call":2,"volume_last_15m":40,"volume_forecast_next_15m":20}'
 ```

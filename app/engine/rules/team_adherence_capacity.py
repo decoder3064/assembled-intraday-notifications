@@ -20,10 +20,11 @@ class TeamAdherenceCapacityRule(Rule):
             self._last_seen = {k: v for k, v in previous._last_seen.items() if k in scoped_ids}
 
     def entity_key(self, event: Event) -> str | None:
+        if event.type != "adherence_check":
+            return None
+
         agent_id = event.agent_id.strip()
-        if event.type != "adherence_check" or agent_id not in {
-            a.strip() for a in self.scope["agent_ids"]
-        }:
+        if agent_id not in {a.strip() for a in self.scope["agent_ids"]}:
             return None
 
         last = self._last_seen.get(agent_id)
